@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu de merde là</title> <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // --- Code PointerLockControls (identique) ---
+        var PointerLockControls = function ( camera, domElement ) {
+             if ( domElement === undefined ) { console.warn( 'THREE.PointerLockControls: domElement mandatory.' ); domElement = document.body; }
+            this.domElement = domElement; this.isLocked = false; this.minPolarAngle = 0; this.maxPolarAngle = Math.PI;
+            var scope = this; var changeEvent = { type: 'change' }; var lockEvent = { type: 'lock' }; var unlockEvent = { type: 'unlock' };
+            var euler = new THREE.Euler( 0, 0, 0, 'YXZ' ); var PI_2 = Math.PI / 2; var vec = new THREE.Vector3();
+            function onMouseMove( event ) { if ( scope.isLocked === false ) return; var movementX = event.movementX || 0; var movementY = event.movementY || 0; euler.setFromQuaternion( camera.quaternion ); euler.y -= movementX * 0.002; euler.x -= movementY * 0.002; euler.x = Math.max( PI_2 - scope.maxPolarAngle, Math.min( PI_2 - scope.minPolarAngle, euler.x ) ); camera.quaternion.setFromEuler( euler ); scope.dispatchEvent( changeEvent ); }
+            function onPointerlockChange() { console.log("PointerlockChange Event."); if ( scope.domElement.ownerDocument.pointerLockElement === scope.domElement ) { console.log("Pointer Lock Acquired."); scope.dispatchEvent( lockEvent ); scope.isLocked = true; } else { console.log("Pointer Lock Released."); scope.dispatchEvent( unlockEvent ); scope.isLocked = false; } }
+            function onPointerlockError() { console.error( 'Pointer Lock Error! Check browser permissions/restrictions.' ); }
+            this.connect = function () { scope.domElement.ownerDocument.addEventListener( 'mousemove', onMouseMove, false ); scope.domElement.ownerDocument.addEventListener( 'pointerlockchange', onPointerlockChange, false ); scope.domElement.ownerDocument.addEventListener( 'pointerlockerror', onPointerlockError, false ); };
+            this.disconnect = function () { scope.domElement.ownerDocument.removeEventListener( 'mousemove', onMouseMove, false ); scope.domElement.ownerDocument.removeEventListener( 'pointerlockchange', onPointerlockChange, false ); scope.domElement.ownerDocument.removeEventListener( 'pointerlockerror', onPointerlockError, false ); };
+            this.dispose = function () { this.disconnect(); }; this.getObject = function () { return camera; };
+            this.getDirection = function () { var direction = new THREE.Vector3( 0, 0, - 1 ); return function ( v ) { return v.copy( direction ).applyQuaternion( camera.quaternion ); }; }();
+            this.lock = function () { console.log("Attempting Pointer Lock via controls.lock()..."); this.domElement.requestPointerLock(); };
+            this.unlock = function () { console.log("Attempting Pointer Unlock..."); scope.domElement.ownerDocument.exitPointerLock(); };
+            this.connect();
+        };
+        PointerLockControls.prototype = Object.create( THREE.EventDispatcher.prototype ); PointerLockControls.prototype.constructor = PointerLockControls;
+        // --- Fin Code PointerLockControls ---
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Styles CSS */
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #000; color: #fff; }
+        canvas { display: block; }
+        #blocker { position: absolute; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; text-align: center; z-index: 20; }
+        #instructions { width: 60%; max-width: 500px; font-size: 20px; background-color: rgba(50, 50, 50, 0.85); padding: 30px; border-radius: 10px; border: 1px solid #aaa; }
+        #difficultySelector { margin-top: 15px; margin-bottom: 20px; }
+        #difficultySelector label { margin-right: 10px; font-weight: bold; }
+        #monsterCount { padding: 8px 12px; border-radius: 6px; border: 1px solid #555; background-color: #333; color: white; font-size: 16px; cursor: pointer; }
+        #startButton { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); padding: 12px 25px; font-size: 18px; font-weight: bold; color: white; background-color: #3b82f6; border: none; border-radius: 8px; cursor: pointer; z-index: 21; transition: background-color 0.2s ease; }
+        #startButton:hover { background-color: #2563eb; }
+        #message { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px; border-radius: 5px; font-size: 18px; z-index: 10; text-align: center; display: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background-color: white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 5; display: none; }
+        #consoleMessage { position: absolute; bottom: 10px; left: 10px; background: rgba(255, 0, 0, 0.7); color: white; padding: 10px; border-radius: 5px; display: none; z-index: 102; }
+
+        /* Style pour l'overlay Jumpscare */
+        #jumpscareOverlay {
+            position: fixed; /* Couvre toute la fenêtre */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000; /* Fond noir par défaut */
+            background-size: contain; /* Ajuste l'image sans déformer */
+            background-position: center center;
+            background-repeat: no-repeat;
+            z-index: 1000; /* Au dessus de tout */
+            display: none; /* Caché par défaut */
+            cursor: default; /* Pas de curseur spécial */
+        }
+    </style>
+</head>
+<body>
+    <div id="blocker">
+        <div id="instructions" class="text-white">
+             <h1 class="text-3xl font-bold mb-4">truc à la con</h1>
+            <p class="mb-2">Trouvez la clé et puis merde .</p>
+            <div id="difficultySelector">
+                 <label for="monsterCount">Nombre de monstres :</label>
+                 <select id="monsterCount" name="monsters">
+                     <option value="1" selected>1 (Normal)</option>
+                     <option value="2">2 (Difficile)</option>
+                     <option value="3">3 (Cauchemar)</option>
+                 </select>
+            </div>
+            <p class="mb-4">Contrôles : ZQSD (ou WASD) pour bouger, Souris pour regarder.</p>
+            <p class="font-bold text-xl">Cliquez sur le bouton ci-dessous pour commencer</p>
+        </div>
+    </div>
+    <button id="startButton">Démarrer cette merde</button>
+    <div id="message">Trouvez la clé !</div>
+    <div id="crosshair"></div>
+    <div id="consoleMessage">Erreur Pointer Lock détectée. Vérifiez la console (F12) !</div>
+
+    <audio id="backgroundMusic" loop style="display: none;"></audio>
+    <audio id="jumpscareSound" style="display: none;"></audio>
+    <div id="jumpscareOverlay"></div>
+
+    <script>
+        // --- Variables globales ---
+        let scene, camera, renderer, controls;
+        let playerVelocity = new THREE.Vector3();
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let clock = new THREE.Clock();
+        let mazeObjects = [];
+        let keyObject = null, exitObject = null;
+        let monsterObjects = [];
+        let hasKey = false;
+        let gameOver = false;
+        let gameWon = false;
+        let textureLoader = new THREE.TextureLoader();
+        let animationFrameId = null;
+        let numMonstersToCreate = 1;
+        let gameInitialized = false;
+        let backgroundAudioElement = null;
+        let jumpscareAudioElement = null; // Référence audio jumpscare
+        let jumpscareOverlayElement = null; // Référence overlay jumpscare
+
+        // --- URLs Musique et Jumpscare ---
+        // !!! IMPORTANT: Remplacez ces URLs par les vôtres !!!
+        const backgroundMusicUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3'; // <--- URL MUSIQUE AMBIANCE
+        const jumpscareImageUrl = 'https://s1.ezgif.com/tmp/ezgif-18cd585c182c09.png'; // <--- URL IMAGE JUMPSCARE
+        const jumpscareSoundUrl = 'https://www.myinstants.com/media/sounds/five-nights-at-freddys-full-scream-sound_2.mp3'; // <--- URL SON JUMPSCARE (MP3)
+
+        // --- Constantes ---
+        // Valeurs modifiées par l'utilisateur
+        const wallSize = 2; const wallHeight = 3; const playerHeight = 1.5;
+        const playerSpeed = 5.0; const monsterSpeed = 5; const playerSize = 0.4;
+        const monsterSpriteWidth = wallSize * 0.6; const monsterSpriteHeight = wallHeight * 0.8;
+        const monsterCollisionSize = 0.8; const keySize = 0.3; const exitSize = 0.5;
+        const mazeLayout = [ /* ... (layout inchangé) ... */
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1],
+            [1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1],
+            [1, 0, 0, 0, 0, 0, 1, 4, 0, 0, 0, 1, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 4, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1],
+            [1, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 4, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+         ];
+        const mazeWidth = mazeLayout[0].length; const mazeDepth = mazeLayout.length;
+        let playerStartPosition = new THREE.Vector3();
+        let keyPosition = new THREE.Vector3(); let exitPosition = new THREE.Vector3();
+
+
+        // --- Initialisation (MODIFIÉE pour éléments jumpscare) ---
+        function init() {
+            console.log("Initialisation du jeu...");
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+            scene.fog = new THREE.Fog(0x111111, 0, 6 * wallSize);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = playerHeight;
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5); scene.add(ambientLight);
+            const flashlight = new THREE.SpotLight(0xffffff, 2.5, 12 * wallSize, Math.PI / 7, 0.4, 1.5);
+            flashlight.position.set(0, 0, 0); flashlight.target.position.set(0, 0, -1);
+            camera.add(flashlight); camera.add(flashlight.target); scene.add(camera);
+
+            // --- Initialisation Audio Ambiance ---
+            backgroundAudioElement = document.getElementById('backgroundMusic');
+            if (backgroundAudioElement && backgroundMusicUrl) {
+                 try { backgroundAudioElement.src = backgroundMusicUrl; console.log("Source audio ambiance définie:", backgroundMusicUrl); }
+                 catch (e) { console.error("Erreur source audio ambiance:", e); backgroundAudioElement = null; }
+            } else if (!backgroundMusicUrl) { console.log("Aucune URL musique ambiance."); }
+            else { console.error("Élément #backgroundMusic non trouvé."); }
+
+            // --- Initialisation Audio + Overlay Jumpscare ---
+            jumpscareAudioElement = document.getElementById('jumpscareSound');
+            jumpscareOverlayElement = document.getElementById('jumpscareOverlay');
+            if (jumpscareAudioElement && jumpscareSoundUrl) {
+                 try { jumpscareAudioElement.src = jumpscareSoundUrl; console.log("Source audio jumpscare définie:", jumpscareSoundUrl); }
+                 catch (e) { console.error("Erreur source audio jumpscare:", e); jumpscareAudioElement = null; }
+            } else if (!jumpscareSoundUrl) { console.log("Aucune URL son jumpscare."); }
+            else { console.error("Élément #jumpscareSound non trouvé."); }
+
+            if (jumpscareOverlayElement && jumpscareImageUrl) {
+                 jumpscareOverlayElement.style.backgroundImage = `url('${jumpscareImageUrl}')`;
+                 console.log("Image jumpscare définie:", jumpscareImageUrl);
+            } else if (!jumpscareImageUrl) { console.log("Aucune URL image jumpscare."); }
+            else { console.error("Élément #jumpscareOverlay non trouvé."); }
+            // --- Fin Initialisation Jumpscare ---
+
+
+            try {
+                controls = new PointerLockControls(camera, renderer.domElement);
+                scene.add(controls.getObject()); console.log("PointerLockControls initialisés.");
+            } catch (error) { /* ... gestion erreur ... */
+                 console.error("Erreur Init PointerLockControls:", error);
+                 document.getElementById('blocker').innerHTML = '<div id="instructions" class="text-white"><h1 class="text-3xl font-bold mb-4 text-red-500">Erreur Init Controls!</h1><p>Voir console (F12).</p></div>';
+                 document.getElementById('startButton').style.display = 'none'; return;
+            }
+            const blocker = document.getElementById('blocker'); const crosshair = document.getElementById('crosshair');
+            const startButton = document.getElementById('startButton'); const consoleMessageDiv = document.getElementById('consoleMessage');
+            const monsterCountSelect = document.getElementById('monsterCount');
+            if (startButton && monsterCountSelect) {
+                startButton.addEventListener('click', () => {
+                    console.log("Bouton 'Démarrer cette merde' cliqué !");
+                    numMonstersToCreate = parseInt(monsterCountSelect.value, 10); console.log("Nombre de monstres choisi:", numMonstersToCreate);
+                    if (controls) { controls.lock(); } else { console.error("L'objet 'controls' n'est pas défini."); }
+                });
+            } else { console.error("Bouton #startButton ou #monsterCount non trouvé !"); }
+
+            if (controls) {
+                controls.addEventListener('lock', () => {
+                    console.log("Événement 'lock' reçu."); blocker.style.display = 'none'; startButton.style.display = 'none'; crosshair.style.display = 'block'; consoleMessageDiv.style.display = 'none';
+                    if (!gameInitialized) {
+                         try { console.log("Création du labyrinthe et des éléments..."); createMaze(numMonstersToCreate); gameInitialized = true; }
+                         catch (error) { console.error("Erreur lors de createMaze au lock:", error); controls.unlock(); return; }
+                    } else { console.log("Jeu déjà initialisé, reprise."); if (monsterObjects.length === 0) { console.log("Recréation des monstres..."); createMaze(numMonstersToCreate); } }
+
+                    // Démarrer Musique Ambiance
+                    if (backgroundAudioElement && backgroundAudioElement.readyState >= 2) {
+                         backgroundAudioElement.play().then(() => console.log("Lecture musique ambiance démarrée.")).catch(error => console.error("Erreur lecture musique ambiance:", error));
+                    } else if (backgroundAudioElement) { console.warn("Musique ambiance pas prête."); }
+
+                    if (!animationFrameId) { console.log("Pointer Lock réussi, démarrage de la boucle d'animation."); animate(); }
+                    if (!hasKey) showMessage("Trouvez la clé jaune !", 3000); else showMessage("Trouvez la sortie verte !", 3000);
+                });
+
+                controls.addEventListener('unlock', () => {
+                    console.log("Événement 'unlock' reçu."); crosshair.style.display = 'none';
+                    if (animationFrameId) { console.log("Pointer Lock perdu, arrêt de la boucle d'animation."); cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+                    if (backgroundAudioElement) { backgroundAudioElement.pause(); console.log("Musique ambiance mise en pause."); }
+                    // Ne pas cacher l'overlay jumpscare ici, endGame s'en charge
+                    if (!gameOver && !gameWon) { blocker.style.display = 'flex'; startButton.style.display = 'block'; }
+                });
+                 const originalError = console.error; console.error = function(message) { originalError.apply(console, arguments); if (typeof message === 'string' && message.includes('Pointer Lock Error')) { if (consoleMessageDiv) consoleMessageDiv.style.display = 'block'; } };
+            }
+            document.addEventListener('keydown', onKeyDown, false); document.addEventListener('keyup', onKeyUp, false); window.addEventListener('resize', onWindowResize, false);
+            console.log("Initialisation terminée. En attente du clic pour démarrer.");
+        }
+
+        // --- Réinitialisation des éléments (inchangée) ---
+        function resetGameElements() { /* ... (identique) ... */
+             monsterObjects.forEach(monster => { if (monster) scene.remove(monster); }); monsterObjects = [];
+             if (keyObject) scene.remove(keyObject); keyObject = null;
+             if (exitObject) scene.remove(exitObject); exitObject = null;
+             mazeObjects.forEach(wall => { if(wall) scene.remove(wall); }); mazeObjects = [];
+             hasKey = false; console.log("Éléments de jeu réinitialisés.");
+         }
+
+
+        // --- Création Labyrinthe (inchangée) ---
+        function createMaze(monsterCount) {
+             console.log(`Création/Recréation du labyrinthe avec ${monsterCount} monstre(s).`);
+             resetGameElements();
+            const wallTextureUrl = 'https://static.wikia.nocookie.net/unanything/images/4/4d/Sanic.png'; // <--- URL MUR
+            const wallTexture = textureLoader.load( wallTextureUrl, (texture) => { console.log("Texture mur chargée:", wallTextureUrl); }, undefined, (error) => { console.error(`Erreur chargement texture mur: ${wallTextureUrl}`, error); wallMaterial.color.setHex(0x553333); wallMaterial.map = null; wallMaterial.needsUpdate = true; } );
+            const wallGeometry = new THREE.BoxGeometry(wallSize, wallHeight, wallSize);
+            const wallMaterial = new THREE.MeshStandardMaterial({ map: wallTexture, roughness: 0.8, metalness: 0.1 });
+            const floorGeometry = new THREE.PlaneGeometry(mazeWidth * wallSize, mazeDepth * wallSize);
+            const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x282828, roughness: 0.95 });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial); floor.rotation.x = -Math.PI / 2; scene.add(floor);
+            const keyGeometry = new THREE.BoxGeometry(keySize * 2, keySize * 4, keySize);
+            const keyMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xaaaa00, roughness: 0.5 });
+            const exitGeometry = new THREE.BoxGeometry(wallSize * 0.8, wallHeight * 0.8, wallSize * 0.1);
+            const exitMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00aa00, roughness: 0.6 });
+            const monsterTextureUrl = 'https://media.tenor.com/Rkl8Hgmla3MAAAAe/shrek.png'; // <--- URL MONSTRE
+            const monsterTexture = textureLoader.load(monsterTextureUrl, undefined, undefined, (error) => { console.error(`Erreur chargement texture monstre: ${monsterTextureUrl}`, error); monsterMaterial.color.setHex(0xff0000); monsterMaterial.map = null; monsterMaterial.needsUpdate = true; });
+            const monsterGeometry = new THREE.PlaneGeometry(monsterSpriteWidth, monsterSpriteHeight);
+            const monsterMaterial = new THREE.MeshBasicMaterial({ map: monsterTexture, color: 0xffffff, transparent: true, /* alphaTest: 0.5, */ side: THREE.DoubleSide });
+            let potentialMonsterStarts = [];
+            for (let z = 0; z < mazeDepth; z++) { for (let x = 0; x < mazeWidth; x++) { const worldX = (x - mazeWidth / 2 + 0.5) * wallSize; const worldZ = (z - mazeDepth / 2 + 0.5) * wallSize; const cellType = mazeLayout[z][x]; if (cellType === 1) { const wall = new THREE.Mesh(wallGeometry, wallMaterial); wall.position.set(worldX, wallHeight / 2, worldZ); scene.add(wall); mazeObjects.push(wall); } else if (cellType === 5) { playerStartPosition.set(worldX, playerHeight, worldZ); camera.position.copy(playerStartPosition); console.log("Position joueur réinitialisée."); } else if (cellType === 2) { keyPosition.set(worldX, keySize * 2, worldZ); keyObject = new THREE.Mesh(keyGeometry, keyMaterial); keyObject.position.copy(keyPosition); scene.add(keyObject); } else if (cellType === 3) { exitPosition.set(worldX, wallHeight * 0.4, worldZ); exitObject = new THREE.Mesh(exitGeometry, exitMaterial); exitObject.position.copy(exitPosition); scene.add(exitObject); } else if (cellType === 4) { potentialMonsterStarts.push(new THREE.Vector3(worldX, monsterSpriteHeight / 2, worldZ)); } } }
+             console.log(`Trouvé ${potentialMonsterStarts.length} emplacements.`); const numToCreate = Math.min(monsterCount, potentialMonsterStarts.length); if (monsterCount > potentialMonsterStarts.length) { console.warn(`Attention: ${monsterCount} monstres demandés, ${potentialMonsterStarts.length} emplacements.`); }
+             for (let i = 0; i < numToCreate; i++) { const monster = new THREE.Mesh(monsterGeometry, monsterMaterial.clone()); monster.position.copy(potentialMonsterStarts[i]); scene.add(monster); monsterObjects.push(monster); console.log(`Monstre ${i + 1} créé.`); }
+             if (playerStartPosition.lengthSq() === 0) console.error("Position joueur (5) non trouvée."); if (!keyObject) console.warn("Position clé (2) non trouvée."); if (!exitObject) console.error("Position sortie (3) non trouvée."); if (monsterObjects.length !== numToCreate) console.warn("Problème création monstres.");
+             hasKey = false; gameOver = false; gameWon = false;
+         }
+
+        // --- Fonctions utilitaires et gestionnaires (inchangées) ---
+        function onKeyDown(event) { /* ... (identique) ... */ switch (event.code) { case 'ArrowUp': case 'KeyW': case 'KeyZ': moveForward = true; break; case 'ArrowLeft': case 'KeyA': case 'KeyQ': moveLeft = true; break; case 'ArrowDown': case 'KeyS': moveBackward = true; break; case 'ArrowRight': case 'KeyD': moveRight = true; break; } }
+        function onKeyUp(event) { /* ... (identique) ... */ switch (event.code) { case 'ArrowUp': case 'KeyW': case 'KeyZ': moveForward = false; break; case 'ArrowLeft': case 'KeyA': case 'KeyQ': moveLeft = false; break; case 'ArrowDown': case 'KeyS': moveBackward = false; break; case 'ArrowRight': case 'KeyD': moveRight = false; break; } }
+        function onWindowResize() { /* ... (identique) ... */ camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+        function worldToGrid(position) { /* ... (identique) ... */ const gridX = Math.floor((position.x + (mazeWidth / 2 * wallSize)) / wallSize); const gridZ = Math.floor((position.z + (mazeDepth / 2 * wallSize)) / wallSize); return { x: gridX, z: gridZ }; }
+        function isCellOpen(gridX, gridZ) { /* ... (identique) ... */ if (gridX < 0 || gridX >= mazeWidth || gridZ < 0 || gridZ >= mazeDepth) return false; return mazeLayout[gridZ][gridX] !== 1; }
+        function checkPlayerWallCollision(position, size) { /* ... (identique) ... */ const gridCoords = worldToGrid(position); for (let i = -1; i <= 1; i++) { for (let j = -1; j <= 1; j++) { const checkX = gridCoords.x + i; const checkZ = gridCoords.z + j; if (!isCellOpen(checkX, checkZ)) { const wallWorldX = (checkX - mazeWidth / 2 + 0.5) * wallSize; const wallWorldZ = (checkZ - mazeDepth / 2 + 0.5) * wallSize; if (position.x + size > wallWorldX - wallSize / 2 && position.x - size < wallWorldX + wallSize / 2 && position.z + size > wallWorldZ - wallSize / 2 && position.z - size < wallWorldZ + wallSize / 2) { return true; } } } } return false; }
+        function showMessage(text, duration = 0) { /* ... (identique) ... */ const messageElement = document.getElementById('message'); messageElement.textContent = text; messageElement.style.display = 'block'; if (duration > 0) { setTimeout(() => { if (messageElement.textContent === text) { messageElement.style.display = 'none'; } }, duration); } }
+        function hideMessage() { /* ... (identique) ... */ document.getElementById('message').style.display = 'none'; }
+
+        // --- endGame (MODIFIÉE pour JUMPSCARE) ---
+        function endGame(win) {
+            if (gameOver || gameWon) return; // Éviter appels multiples
+
+            // Arrêter la musique d'ambiance immédiatement
+            if (backgroundAudioElement) { backgroundAudioElement.pause(); }
+
+            // Marquer jeu comme terminé (ou gagné)
+            gameOver = !win;
+            gameWon = win;
+
+            // Arrêter la boucle d'animation principale
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+
+            // Libérer le pointeur (important pour pouvoir interagir après)
+            if(controls) controls.unlock(); // Déclenche aussi l'event 'unlock'
+
+            // Désactiver les contrôles clavier
+            document.removeEventListener('keydown', onKeyDown);
+            document.removeEventListener('keyup', onKeyUp);
+
+            // Cacher le viseur
+            const crosshair = document.getElementById('crosshair');
+            if(crosshair) crosshair.style.display = 'none';
+
+            if (win) {
+                // Si victoire, afficher directement l'écran de victoire
+                const blocker = document.getElementById('blocker');
+                const instructions = document.getElementById('instructions');
+                const startButton = document.getElementById('startButton');
+                blocker.style.display = 'flex'; instructions.style.display = ''; startButton.style.display = 'block';
+                // Titre modifié par l'utilisateur
+                instructions.innerHTML = '<h1 class="text-3xl font-bold mb-4 text-green-400">Bonjour non</h1><p>Vous vous êtes échappé.</p>';
+                hideMessage();
+                const restartButton = document.createElement('button'); restartButton.textContent = 'Recommencer'; restartButton.className = 'mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white font-bold rounded'; restartButton.onclick = () => restartGame(); instructions.appendChild(restartButton);
+                gameInitialized = false; // Marquer pour recréer au prochain lock
+            } else {
+                // Si défaite (attrapé par monstre), déclencher le JUMPSCARE
+                console.log("Défaite détectée, déclenchement du jumpscare...");
+
+                // Afficher l'overlay jumpscare
+                if (jumpscareOverlayElement) {
+                    jumpscareOverlayElement.style.display = 'block';
+                } else { console.error("Overlay Jumpscare non trouvé!"); }
+
+                // Jouer le son jumpscare
+                if (jumpscareAudioElement && jumpscareAudioElement.readyState >= 2) {
+                     jumpscareAudioElement.currentTime = 0; // Rembobiner
+                     jumpscareAudioElement.play().catch(e => console.error("Erreur lecture son jumpscare:", e));
+                } else if (jumpscareAudioElement) {
+                     console.warn("Son jumpscare pas prêt.");
+                     // Essayer de jouer dès que possible (moins immédiat)
+                     jumpscareAudioElement.addEventListener('canplaythrough', () => {
+                         jumpscareAudioElement.currentTime = 0;
+                         jumpscareAudioElement.play().catch(e => console.error("Erreur lecture son jumpscare (différé):", e));
+                     }, { once: true });
+                } else { console.log("Pas de son jumpscare à jouer."); }
+
+                // Définir un timer pour cacher le jumpscare et afficher l'écran Game Over
+                setTimeout(() => {
+                    console.log("Fin du timer jumpscare.");
+                    // Cacher l'overlay jumpscare
+                    if (jumpscareOverlayElement) {
+                        jumpscareOverlayElement.style.display = 'none';
+                    }
+                    // Afficher l'écran Game Over normal
+                    const blocker = document.getElementById('blocker');
+                    const instructions = document.getElementById('instructions');
+                    const startButton = document.getElementById('startButton');
+                    if (blocker && instructions && startButton) {
+                         blocker.style.display = 'flex'; instructions.style.display = ''; startButton.style.display = 'block';
+                         // Titre modifié par l'utilisateur
+                         instructions.innerHTML = '<h1 class="text-3xl font-bold mb-4 text-red-500">t nul mdr</h1><p>dans ton cul</p>';
+                         hideMessage();
+                         const restartButton = document.createElement('button'); restartButton.textContent = 'Recommencer'; restartButton.className = 'mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white font-bold rounded'; restartButton.onclick = () => restartGame(); instructions.appendChild(restartButton);
+                    } else { console.error("Impossible d'afficher l'écran Game Over (éléments manquants)."); }
+                    gameInitialized = false; // Marquer pour recréer au prochain lock
+                }, 2000); // 2000 millisecondes = 2 secondes
+            }
+        }
+        // --- restartGame (inchangée) ---
+        function restartGame() {
+             console.log("Redémarrage du jeu..."); if (controls && controls.isLocked) { controls.unlock(); } else { if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } if (backgroundAudioElement) { backgroundAudioElement.pause(); backgroundAudioElement.currentTime = 0; } }
+             const blocker = document.getElementById('blocker'); const instructions = document.getElementById('instructions'); const startButton = document.getElementById('startButton');
+             blocker.style.display = 'flex'; instructions.style.display = ''; startButton.style.display = 'block';
+             const oldRestartButton = instructions.querySelector('button'); if (oldRestartButton) instructions.removeChild(oldRestartButton);
+             gameOver = false; gameWon = false; hasKey = false; gameInitialized = false;
+             document.addEventListener('keydown', onKeyDown, false); document.addEventListener('keyup', onKeyUp, false);
+             showMessage("Choisissez la difficulté et démarrez.", 5000);
+             // S'assurer que l'overlay jumpscare est caché au redémarrage
+             if(jumpscareOverlayElement) jumpscareOverlayElement.style.display = 'none';
+        }
+
+        // --- IA Monstres (inchangée) ---
+        function updateMonsters(delta) { /* ... (identique) ... */
+            if (gameOver || gameWon) return; const playerPos = camera.position;
+            for (let i = 0; i < monsterObjects.length; i++) { const monster = monsterObjects[i]; if (!monster) continue; const monsterPos = monster.position; const monsterGrid = worldToGrid(monsterPos); const playerGrid = worldToGrid(playerPos); const diffX = playerGrid.x - monsterGrid.x; const diffZ = playerGrid.z - monsterGrid.z; let moveX = 0, moveZ = 0; if (Math.abs(diffX) > Math.abs(diffZ)) { if (diffX !== 0) moveX = Math.sign(diffX); } else { if (diffZ !== 0) moveZ = Math.sign(diffZ); } let primaryMovePossible = isCellOpen(monsterGrid.x + moveX, monsterGrid.z + moveZ); if (!primaryMovePossible) { if (Math.abs(diffX) <= Math.abs(diffZ)) { if (diffX !== 0) moveX = Math.sign(diffX); else moveX = 0; moveZ = 0; } else { if (diffZ !== 0) moveZ = Math.sign(diffZ); else moveZ = 0; moveX = 0; } if (!isCellOpen(monsterGrid.x + moveX, monsterGrid.z + moveZ)) { const possibleMoves = []; if (isCellOpen(monsterGrid.x + 1, monsterGrid.z)) possibleMoves.push({x: 1, z: 0}); if (isCellOpen(monsterGrid.x - 1, monsterGrid.z)) possibleMoves.push({x: -1, z: 0}); if (isCellOpen(monsterGrid.x, monsterGrid.z + 1)) possibleMoves.push({x: 0, z: 1}); if (isCellOpen(monsterGrid.x, monsterGrid.z - 1)) possibleMoves.push({x: 0, z: -1}); if (possibleMoves.length > 0) { const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)]; moveX = randomMove.x; moveZ = randomMove.z; } else { moveX = 0; moveZ = 0; } } } const moveDirection = new THREE.Vector3(moveX, 0, moveZ).normalize(); const potentialPosition = monsterPos.clone(); potentialPosition.addScaledVector(moveDirection, monsterSpeed * delta); monsterPos.copy(potentialPosition); const dxPlayerMonster = playerPos.x - monsterPos.x; const dzPlayerMonster = playerPos.z - monsterPos.z; const distanceXZ = Math.sqrt(dxPlayerMonster * dxPlayerMonster + dzPlayerMonster * dzPlayerMonster); if (distanceXZ < playerSize + monsterCollisionSize) { console.log(`Collision joueur-monstre ${i} (XZ)! D:`, distanceXZ); endGame(false); return; } }
+         }
+
+        // --- Boucle d'animation (inchangée) ---
+        function animate() {
+            animationFrameId = requestAnimationFrame(animate); const delta = clock.getDelta();
+            if (controls && controls.isLocked === true && !gameOver && !gameWon) {
+                // --- Déplacement Joueur ---
+                const moveDirection=new THREE.Vector3(), rightDirection=new THREE.Vector3(); try { controls.getDirection(moveDirection).setY(0).normalize(); } catch (e) { console.error("Erreur dans controls.getDirection:", e); return; } rightDirection.crossVectors(camera.up, moveDirection).normalize(); playerVelocity.x=0; playerVelocity.z=0; if(moveForward) playerVelocity.add(moveDirection); if(moveBackward) playerVelocity.sub(moveDirection); if(moveLeft) playerVelocity.add(rightDirection); if(moveRight) playerVelocity.sub(rightDirection);
+                if(playerVelocity.lengthSq() > 0){ playerVelocity.normalize().multiplyScalar(playerSpeed * delta); const currentPosition = controls.getObject().position; const potentialPosition = currentPosition.clone().add(playerVelocity); const collision = checkPlayerWallCollision(potentialPosition, playerSize); if(!collision){ controls.getObject().position.add(playerVelocity); } }
+                // --- Fin Déplacement ---
+                // --- Collecte/Sortie ---
+                if(!hasKey && keyObject){ const dx=camera.position.x-keyObject.position.x, dz=camera.position.z-keyObject.position.z; if(Math.sqrt(dx*dx+dz*dz) < playerSize+keySize){ hasKey=true; scene.remove(keyObject); keyObject=null; showMessage("Clé trouvée ! Trouvez la sortie verte !", 5000); }}
+                if(hasKey && exitObject){ const dxE=camera.position.x-exitObject.position.x, dzE=camera.position.z-exitObject.position.z; if(Math.sqrt(dxE*dxE+dzE*dzE) < playerSize+exitSize){ endGame(true); }}
+                // --- Fin Collecte/Sortie ---
+                 updateMonsters(delta);
+                 const playerLookAtPos = new THREE.Vector3(camera.position.x, 0, camera.position.z);
+                 for (let i = 0; i < monsterObjects.length; i++) { const monster = monsterObjects[i]; if (monster) { playerLookAtPos.y = monster.position.y; monster.lookAt(playerLookAtPos); } }
+                 if (keyObject) { keyObject.rotation.y += delta * 2; }
+            }
+            try { renderer.render(scene, camera); } catch (error) { console.error("Erreur rendu:", error); if(animationFrameId) cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+        }
+
+        // --- Lancement ---
+        try { init(); } catch(error) { console.error("Erreur Globale Init:", error); document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif;"><h1>Erreur Critique</h1><p>Impossible de démarrer le jeu. Vérifiez la console.</p><pre>' + error.stack + '</pre></div>'; }
+
+    </script>
+</body>
+</html>
